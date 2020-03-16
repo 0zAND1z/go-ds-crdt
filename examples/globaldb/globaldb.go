@@ -20,9 +20,8 @@ import (
 	crdt "github.com/ipfs/go-ds-crdt"
 	logging "github.com/ipfs/go-log"
 
-	"github.com/libp2p/go-libp2p"
-	connmgr "github.com/libp2p/go-libp2p-connmgr"
 	"github.com/libp2p/go-libp2p-core/crypto"
+	corecrypto "github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/peer"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
@@ -37,12 +36,18 @@ var (
 	logger    = logging.Logger("globaldb")
 	listen, _ = multiaddr.NewMultiaddr("/ip4/0.0.0.0/tcp/33123")
 	topic     = "globaldb-example"
+	netTopic  = "globaldb-example-net"
 	config    = "globaldb-example"
 )
 
 func main() {
-	logging.SetLogLevel("*", "warn")
+	// Bootstrappers are using 1024 keys. See:
+	// https://github.com/ipfs/infra/issues/378
+	corecrypto.MinRsaKeyBits = 1024
+
+	logging.SetLogLevel("*", "error")
 	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	dir, err := homedir.Dir()
 	if err != nil {
@@ -90,15 +95,16 @@ func main() {
 		logger.Fatal(err)
 	}
 
-	connman := connmgr.NewConnManager(100, 400, time.Minute)
-
 	h, dht, err := ipfslite.SetupLibp2p(
 		ctx,
 		priv,
 		nil,
 		[]multiaddr.Multiaddr{listen},
-		libp2p.ConnectionManager(connman),
+		ipfslite.Libp2pOptionsExtra...,
 	)
+	if err != nil {
+		logger.Fatal(err)
+	}
 	defer h.Close()
 	defer dht.Close()
 
@@ -106,6 +112,36 @@ func main() {
 	if err != nil {
 		logger.Fatal(err)
 	}
+
+	netSubs, err := psub.Subscribe(netTopic)
+	if err != nil {
+		logger.Fatal(err)
+	}
+
+	// Use a special pubsub topic to avoid disconnecting
+	// from globaldb peers.
+	go func() {
+		for {
+			msg, err := netSubs.Next(ctx)
+			if err != nil {
+				fmt.Println(err)
+				break
+			}
+			h.ConnManager().TagPeer(msg.ReceivedFrom, "keep", 100)
+		}
+	}()
+
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+				psub.Publish(netTopic, []byte("hi!"))
+				time.Sleep(20 * time.Second)
+			}
+		}
+	}()
 
 	ipfs, err := ipfslite.New(ctx, store, h, dht, nil)
 	if err != nil {
@@ -119,7 +155,7 @@ func main() {
 
 	opts := crdt.DefaultOptions()
 	opts.Logger = logger
-	opts.RebroadcastInterval = 10 * time.Second
+	opts.RebroadcastInterval = 5 * time.Second
 	opts.PutHook = func(k ds.Key, v []byte) {
 		fmt.Printf("Added: [%s] -> %s\n", k, string(v))
 
@@ -140,7 +176,7 @@ func main() {
 	inf, _ := peer.AddrInfoFromP2pAddr(bstr)
 	list := append(ipfslite.DefaultBootstrapPeers(), *inf)
 	ipfs.Bootstrap(list)
-	connman.TagPeer(inf.ID, "keep", 100)
+	h.ConnManager().TagPeer(inf.ID, "keep", 100)
 
 	fmt.Printf(`
 Peer ID: %s
@@ -178,7 +214,6 @@ Commands:
 			syscall.SIGHUP,
 		)
 		<-signalChan
-		cancel()
 		return
 	}
 
@@ -196,7 +231,6 @@ Commands:
 
 		switch cmd {
 		case "exit", "quit":
-			cancel()
 			return
 		case "debug":
 			if len(fields) < 2 {
