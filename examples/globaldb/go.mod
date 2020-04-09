@@ -3,7 +3,7 @@ module github.com/ipfs/go-ds-crdt/examples/globaldb
 go 1.12
 
 require (
-	github.com/btcsuite/btcd v0.20.0-beta // indirect
+	// github.com/btcsuite/btcd v0.20.0-beta // indirect
 	github.com/hsanjuan/ipfs-lite v0.1.7
 	github.com/ipfs/go-datastore v0.1.1
 	github.com/ipfs/go-ds-crdt v0.1.7
