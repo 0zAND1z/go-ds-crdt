@@ -172,7 +172,7 @@ func main() {
 
 	fmt.Println("Bootstrapping...")
 
-	bstr, _ := multiaddr.NewMultiaddr("/ip4/94.130.135.167/tcp/33123/ipfs/12D3KooWFta2AE7oiK1ioqjVAKajUJauZWfeM7R413K7ARtHRDAu")
+	bstr, _ := multiaddr.NewMultiaddr("/ip4/106.51.82.232/tcp/33123/ipfs/12D3KooWD8k9139st5owt5dMAASecpBPXSVW47goL38sN6uLEEWH")
 	inf, _ := peer.AddrInfoFromP2pAddr(bstr)
 	list := append(ipfslite.DefaultBootstrapPeers(), *inf)
 	ipfs.Bootstrap(list)
@@ -201,10 +201,91 @@ Commands:
 	if len(os.Args) > 1 && os.Args[1] == "daemon" {
 		fmt.Println("Running in daemon mode")
 		go func() {
-			for {
+			fmt.Printf("> ")
+			scanner := bufio.NewScanner(os.Stdin)
+			for scanner.Scan() {
+				text := scanner.Text()
+				fields := strings.Fields(text)
+				if len(fields) == 0 {
+					fmt.Printf("> ")
+					continue
+				}
+
+				cmd := fields[0]
+
+				switch cmd {
+				case "exit", "quit":
+					return
+				case "debug":
+					if len(fields) < 2 {
+						fmt.Println("debug <on/off/peers>")
+					}
+					st := fields[1]
+					switch st {
+					case "on":
+						logging.SetLogLevel("globaldb", "debug")
+					case "off":
+						logging.SetLogLevel("globaldb", "error")
+					case "peers":
+						for _, p := range connectedPeers(h) {
+							addrs, err := peer.AddrInfoToP2pAddrs(p)
+							if err != nil {
+								logger.Warning(err)
+								continue
+							}
+							for _, a := range addrs {
+								fmt.Println(a)
+							}
+						}
+					}
+				case "list":
+					q := query.Query{}
+					results, err := crdt.Query(q)
+					if err != nil {
+						printErr(err)
+					}
+					for r := range results.Next() {
+						if r.Error != nil {
+							printErr(err)
+							continue
+						}
+						fmt.Printf("[%s] -> %s\n", r.Key, string(r.Value))
+					}
+				case "get":
+					if len(fields) < 2 {
+						fmt.Println("get <key>")
+						fmt.Println("> ")
+						continue
+					}
+					k := ds.NewKey(fields[1])
+					v, err := crdt.Get(k)
+					if err != nil {
+						printErr(err)
+						continue
+					}
+					fmt.Printf("[%s] -> %s\n", k, string(v))
+				case "put":
+					if len(fields) < 3 {
+						fmt.Println("put <key> <value>")
+						fmt.Println("> ")
+						continue
+					}
+					k := ds.NewKey(fields[1])
+					v := strings.Join(fields[2:], " ")
+					err := crdt.Put(k, []byte(v))
+					if err != nil {
+						printErr(err)
+						continue
+					}
+				}
+
 				fmt.Printf("%s - %d connected peers\n", time.Now().Format(time.Stamp), len(connectedPeers(h)))
-				time.Sleep(10 * time.Second)
+				fmt.Printf("> ")
 			}
+			// for {
+
+			// 	time.Sleep(10 * time.Second)
+			// }
 		}()
 		signalChan := make(chan os.Signal, 20)
 		signal.Notify(
@@ -217,85 +298,6 @@ Commands:
 		return
 	}
 
-	fmt.Printf("> ")
-	scanner := bufio.NewScanner(os.Stdin)
-	for scanner.Scan() {
-		text := scanner.Text()
-		fields := strings.Fields(text)
-		if len(fields) == 0 {
-			fmt.Printf("> ")
-			continue
-		}
-
-		cmd := fields[0]
-
-		switch cmd {
-		case "exit", "quit":
-			return
-		case "debug":
-			if len(fields) < 2 {
-				fmt.Println("debug <on/off/peers>")
-			}
-			st := fields[1]
-			switch st {
-			case "on":
-				logging.SetLogLevel("globaldb", "debug")
-			case "off":
-				logging.SetLogLevel("globaldb", "error")
-			case "peers":
-				for _, p := range connectedPeers(h) {
-					addrs, err := peer.AddrInfoToP2pAddrs(p)
-					if err != nil {
-						logger.Warning(err)
-						continue
-					}
-					for _, a := range addrs {
-						fmt.Println(a)
-					}
-				}
-			}
-		case "list":
-			q := query.Query{}
-			results, err := crdt.Query(q)
-			if err != nil {
-				printErr(err)
-			}
-			for r := range results.Next() {
-				if r.Error != nil {
-					printErr(err)
-					continue
-				}
-				fmt.Printf("[%s] -> %s\n", r.Key, string(r.Value))
-			}
-		case "get":
-			if len(fields) < 2 {
-				fmt.Println("get <key>")
-				fmt.Println("> ")
-				continue
-			}
-			k := ds.NewKey(fields[1])
-			v, err := crdt.Get(k)
-			if err != nil {
-				printErr(err)
-				continue
-			}
-			fmt.Printf("[%s] -> %s\n", k, string(v))
-		case "put":
-			if len(fields) < 3 {
-				fmt.Println("put <key> <value>")
-				fmt.Println("> ")
-				continue
-			}
-			k := ds.NewKey(fields[1])
-			v := strings.Join(fields[2:], " ")
-			err := crdt.Put(k, []byte(v))
-			if err != nil {
-				printErr(err)
-				continue
-			}
-		}
-		fmt.Printf("> ")
-	}
 }
 
 func printErr(err error) {
