@@ -40,18 +40,20 @@ See https://godoc.org/github.com/ipfs/go-ds-crdt for more information.
 
 ## How to use
 
-### 1. Navigate to the following folder
+### 1. Navigate to the following folder and update the `config.yaml` file
 
 ``` sh
 $ cd examples/globaldb
 ```
+
+Update the `config.yaml` file in the examples/globaldb folder, preferably with the multiaddr of your IPFS node.
 
 ### 2. Run globaldb.go along with the argument `daemon`
 
 ``` sh
 $ go run globaldb.go daemon
 Bootstrapping...
-
+Connecting to the bootstrap node specified in config.yaml:  /ip4/A.B.C.D/tcp/4001/p2p/QmABC
 Peer ID: Qm123
 Listen address: /ip4/0.0.0.0/tcp/33123
 Topic: globaldb-example
@@ -76,7 +78,7 @@ Running in daemon mode
 ```sh
 > put "IPFS" "Permanent web"
 Added: [/"IPFS"] -> "Permanent web"
-Apr  9 18:50:55 - 75 connected peers
+Apr  9 18:50:55 - 1 connected peers
 ```
 
 The last line displays the fellow IPFS nodes connected, as you are running in daemon mode.
@@ -86,7 +88,7 @@ The last line displays the fellow IPFS nodes connected, as you are running in da
 ```sh
 > get "IPFS"
 [/"IPFS"] -> "Permanent web"
-Apr  9 18:52:27 - 134 connected peers
+Apr  9 18:52:27 - 2 connected peers
 ```
 
 ### 5. List all the Key-Value entries stored locally
@@ -97,7 +99,7 @@ Apr  9 18:52:27 - 134 connected peers
 [/hey] -> you
 [/heyy] -> baby
 [/utthista] -> bhaaratha
-Apr  9 18:53:28 - 176 connected peers
+Apr  9 18:53:28 - 3 connected peers
 ```
 
 You can see all the Key-Value entries stored locally.
