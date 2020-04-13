@@ -17,4 +17,5 @@ require (
 	github.com/multiformats/go-multiaddr-net v0.1.1 // indirect
 	golang.org/x/crypto v0.0.0-20191029031824-8986dd9e96cf // indirect
 	golang.org/x/sys v0.0.0-20191104094858-e8c54fb511f6 // indirect
+	gopkg.in/yaml.v2 v2.2.2
 )

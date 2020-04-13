@@ -19,6 +19,7 @@ import (
 	"github.com/ipfs/go-datastore/query"
 	crdt "github.com/ipfs/go-ds-crdt"
 	logging "github.com/ipfs/go-log"
+	"gopkg.in/yaml.v2"
 
 	"github.com/libp2p/go-libp2p-core/crypto"
 	corecrypto "github.com/libp2p/go-libp2p-core/crypto"
@@ -31,6 +32,11 @@ import (
 
 	multiaddr "github.com/multiformats/go-multiaddr"
 )
+
+// Config defines config.yaml
+type Config struct {
+	BootstrapNode string `yaml:"bootstrap"`
+}
 
 var (
 	logger    = logging.Logger("globaldb")
@@ -171,10 +177,25 @@ func main() {
 	defer crdt.Close()
 
 	fmt.Println("Bootstrapping...")
+	filename, _ := filepath.Abs("./config.yaml")
+	yamlFile, err := ioutil.ReadFile(filename)
+	if err != nil {
+		panic(err)
+	}
 
-	bstr, _ := multiaddr.NewMultiaddr("/ip4/106.51.82.232/tcp/33123/ipfs/12D3KooWD8k9139st5owt5dMAASecpBPXSVW47goL38sN6uLEEWH")
+	var config Config
+
+	err = yaml.Unmarshal(yamlFile, &config)
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Println("Connecting to the bootstrap node specified in config.yaml: ", config.BootstrapNode)
+
+	bstr, _ := multiaddr.NewMultiaddr(config.BootstrapNode)
 	inf, _ := peer.AddrInfoFromP2pAddr(bstr)
-	list := append(ipfslite.DefaultBootstrapPeers(), *inf)
+	var emptyBootstrapList []peer.AddrInfo // Empty bootstrap list. You can populate this as required!
+	list := append(emptyBootstrapList, *inf)
 	ipfs.Bootstrap(list)
 	h.ConnManager().TagPeer(inf.ID, "keep", 100)
 

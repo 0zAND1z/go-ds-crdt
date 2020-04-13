@@ -1,0 +1,2 @@
+# Replace this with your bootstrap node.
+bootstrap: "/ip4/A.B.C.D/tcp/4001/p2p/QmABC"
